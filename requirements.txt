@@ -1,0 +1,2 @@
+shiny
+posit-sdk>=0.9.0
