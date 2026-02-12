@@ -11,32 +11,34 @@ Displays diagnostic info about:
 import os
 import json
 import traceback
+import urllib.request
+import urllib.error
 
-from shiny import App, Inputs, Outputs, Session, render, ui
+from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
 app_ui = ui.page_fluid(
     ui.h2("OAuth Credentials Test"),
+    ui.input_action_button("refresh", "Refresh All"),
     ui.hr(),
     ui.h3("Environment"),
     ui.output_text_verbatim("env_info"),
     ui.hr(),
-    ui.h3("Credentials Response"),
+    ui.h3("Credentials Response (posit-sdk)"),
     ui.output_text_verbatim("credentials_result"),
     ui.hr(),
     ui.h3("Raw HTTP Test"),
     ui.output_text_verbatim("raw_http_result"),
-    ui.hr(),
-    ui.input_action_button("refresh", "Refresh"),
 )
 
 
 def server(i: Inputs, o: Outputs, session: Session):
     @render.text
-    @i.refresh
     def env_info():
+        # Take dependency on refresh button, but also render on first load
+        i.refresh()
+
         connect_server = os.environ.get("CONNECT_SERVER", "<not set>")
         posit_product = os.environ.get("POSIT_PRODUCT", "<not set>")
-        # Show all CONNECT_* env vars (values redacted for safety)
         connect_vars = {
             k: (v[:20] + "..." if len(v) > 20 else v)
             for k, v in os.environ.items()
@@ -52,22 +54,30 @@ def server(i: Inputs, o: Outputs, session: Session):
         return "\n".join(lines)
 
     @render.text
-    @i.refresh
     def credentials_result():
+        i.refresh()
+
+        lines = []
         try:
             from posit import connect
 
-            client = connect.Client()
             session_token = session.http_conn.headers.get(
                 "Posit-Connect-User-Session-Token"
             )
-
-            lines = [f"User session token present: {session_token is not None}"]
-
+            lines.append(f"User session token present: {session_token is not None}")
             if session_token:
                 lines.append(
                     f"User session token (first 20 chars): {session_token[:20]}..."
                 )
+
+            # Try initializing the client
+            try:
+                client = connect.Client()
+                lines.append(f"Client initialized OK (url={client.config.url})")
+            except Exception as e:
+                lines.append(f"Client() init error: {type(e).__name__}: {e}")
+                lines.append(traceback.format_exc())
+                return "\n".join(lines)
 
             # Try get_credentials (viewer OAuth)
             try:
@@ -93,16 +103,16 @@ def server(i: Inputs, o: Outputs, session: Session):
                     f"get_content_credentials() error: {type(e).__name__}: {e}"
                 )
 
-            return "\n".join(lines)
         except Exception as e:
-            return f"Failed to initialize posit-sdk client:\n{type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+            lines.append(
+                f"Unexpected error: {type(e).__name__}: {e}\n\n{traceback.format_exc()}"
+            )
+
+        return "\n".join(lines)
 
     @render.text
-    @i.refresh
     def raw_http_result():
-        """Make a raw HTTP request to the credentials endpoint to see exactly what happens."""
-        import urllib.request
-        import urllib.error
+        i.refresh()
 
         connect_server = os.environ.get("CONNECT_SERVER")
         if not connect_server:
