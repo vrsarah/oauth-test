@@ -70,10 +70,17 @@ def server(i: Inputs, o: Outputs, session: Session):
                     f"User session token (first 20 chars): {session_token[:20]}..."
                 )
 
+            # Show all headers for debugging
+            lines.append("")
+            lines.append("All request headers:")
+            for k, v in session.http_conn.headers.items():
+                val = v[:30] + "..." if len(v) > 30 else v
+                lines.append(f"  {k}: {val}")
+
             # Try initializing the client
             try:
                 client = connect.Client()
-                lines.append(f"Client initialized OK (url={client.config.url})")
+                lines.append(f"\nClient initialized OK (url={client.cfg.url})")
             except Exception as e:
                 lines.append(f"Client() init error: {type(e).__name__}: {e}")
                 lines.append(traceback.format_exc())
