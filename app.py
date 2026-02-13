@@ -125,23 +125,36 @@ def server(i: Inputs, o: Outputs, session: Session):
         if not connect_server:
             return "CONNECT_SERVER not set - cannot make raw HTTP request"
 
+        # Check server_settings for connect version
+        settings_url = f"{connect_server}/__api__/server_settings"
+        lines = [f"GET {settings_url}"]
+        try:
+            req = urllib.request.Request(settings_url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                lines.append(f"  Connect version: {body.get('version', '<missing>')}")
+        except Exception as e:
+            lines.append(f"  Error: {type(e).__name__}: {e}")
+
+        lines.append("")
+
+        # Check credentials endpoint
         url = f"{connect_server}/__api__/v1/oauth/integrations/credentials"
-        lines = [f"POST {url}", ""]
+        lines.append(f"POST {url}")
 
         try:
             req = urllib.request.Request(url, method="POST", data=b"")
             req.add_header("Content-Type", "application/json")
             with urllib.request.urlopen(req, timeout=5) as resp:
                 body = resp.read().decode("utf-8")
-                lines.append(f"Status: {resp.status}")
-                lines.append(f"Headers: {dict(resp.headers)}")
-                lines.append(f"Body: {body}")
+                lines.append(f"  Status: {resp.status}")
+                lines.append(f"  Body: {body}")
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8") if e.fp else "<no body>"
-            lines.append(f"HTTP Error: {e.code}")
-            lines.append(f"Body: {body}")
+            lines.append(f"  HTTP Error: {e.code}")
+            lines.append(f"  Body: {body}")
         except Exception as e:
-            lines.append(f"Error: {type(e).__name__}: {e}")
+            lines.append(f"  Error: {type(e).__name__}: {e}")
 
         return "\n".join(lines)
 
