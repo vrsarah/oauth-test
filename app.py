@@ -88,7 +88,10 @@ def server(i: Inputs, o: Outputs, session: Session):
 
             # Try get_credentials (viewer OAuth)
             try:
-                credentials = client.oauth.get_credentials(session_token)
+                credentials = client.oauth.get_credentials(
+                    session_token,
+                    audience="019d01ea-abfd-1746-6c67-efcb7743d141",
+                )
                 lines.append("")
                 lines.append("get_credentials() response:")
                 lines.append(json.dumps(credentials, indent=2, default=str))
